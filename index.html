@@ -24,7 +24,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft
 
 .main { max-width: 860px; margin: 28px auto; padding: 0 20px 80px; }
 
-.card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); padding: 26px 30px; margin-bottom: 18px; }
+.card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(7, 6, 6, 0.07); padding: 26px 30px; margin-bottom: 18px; }
 .card-title { font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 8px; }
 .card-title::before { content: ''; display: inline-block; width: 4px; height: 18px; background: #2563eb; border-radius: 2px; flex-shrink: 0; }
 
@@ -630,18 +630,22 @@ async function doSubmit() {
   const btn = document.getElementById('submit-btn');
   btn.disabled = true; btn.textContent = '提交中…';
   try {
-    const { data: ass, error: e1 } = await sb.from('assessments').insert({
+    // Generate UUID on client to avoid needing SELECT permission after INSERT
+    const assessmentId = crypto.randomUUID();
+
+    const { error: e1 } = await sb.from('assessments').insert({
+      id: assessmentId,
       hub: S.hub, assessor: S.assessor, assessed_person: S.person,
       positions: S.positions, period: S.period,
       kpi_section_weight: S.kpiSW, kpa_section_weight: S.kpaSW,
-    }).select().single();
+    });
     if (e1) throw e1;
 
-    const kpiRows = Object.values(S.kpis).map(k=>({ assessment_id:ass.id, kpi_name:k.name, category:k.cat, weight:k.weight }));
+    const kpiRows = Object.values(S.kpis).map(k=>({ assessment_id:assessmentId, kpi_name:k.name, category:k.cat, weight:k.weight }));
     const { error: e2 } = await sb.from('assessment_kpis').insert(kpiRows);
     if (e2) throw e2;
 
-    const kpaRows = S.kpas.map(x=>({ assessment_id:ass.id, l1_name:x.l1, l2_name:x.l2, weight:x.weight }));
+    const kpaRows = S.kpas.map(x=>({ assessment_id:assessmentId, l1_name:x.l1, l2_name:x.l2, weight:x.weight }));
     const { error: e3 } = await sb.from('assessment_kpas').insert(kpaRows);
     if (e3) throw e3;
 
