@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KPI & KPA 考核指标设立</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f0f4f8; color: #1e293b; min-height: 100vh; }
+
+.header { background: linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%); color: white; padding: 20px 40px; box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
+.header h1 { font-size: 20px; font-weight: 700; }
+.header p { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+
+.steps-bar { background: white; border-bottom: 1px solid #e2e8f0; padding: 0 40px; display: flex; position: sticky; top: 0; z-index: 50; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.step-item { padding: 14px 20px; font-size: 13px; font-weight: 500; color: #94a3b8; border-bottom: 3px solid transparent; display: flex; align-items: center; gap: 8px; transition: all 0.2s; white-space: nowrap; }
+.step-item.active { color: #2563eb; border-bottom-color: #2563eb; }
+.step-item.done { color: #10b981; cursor: pointer; }
+.step-num { width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; transition: all 0.2s; }
+.step-item.active .step-num { background: #2563eb; color: white; }
+.step-item.done .step-num { background: #10b981; color: white; }
+
+.main { max-width: 860px; margin: 28px auto; padding: 0 20px 80px; }
+
+.card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); padding: 26px 30px; margin-bottom: 18px; }
+.card-title { font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 8px; }
+.card-title::before { content: ''; display: inline-block; width: 4px; height: 18px; background: #2563eb; border-radius: 2px; flex-shrink: 0; }
+
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.4px; }
+.form-group input, .form-group select { padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 14px; color: #1e293b; background: white; transition: border-color 0.2s, box-shadow 0.2s; font-family: inherit; }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+.tag-select-wrap { position: relative; }
+.tag-select { display: flex; flex-wrap: wrap; gap: 6px; padding: 7px 10px; border: 1.5px solid #e2e8f0; border-radius: 8px; min-height: 42px; cursor: pointer; align-items: center; transition: border-color 0.2s; }
+.tag-select.open { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+.tag-ph { color: #94a3b8; font-size: 13px; }
+.tag { padding: 3px 10px; background: #eff6ff; color: #2563eb; border-radius: 20px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+.tag-x { cursor: pointer; color: #93c5fd; }
+.tag-x:hover { color: #1d4ed8; }
+.pos-dd { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: white; border: 1.5px solid #e2e8f0; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); z-index: 200; max-height: 220px; overflow-y: auto; padding: 6px; }
+.pos-opt { padding: 9px 12px; cursor: pointer; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.pos-opt:hover { background: #f0f6ff; }
+.pos-opt.sel { color: #2563eb; font-weight: 600; }
+.pos-chk { width: 16px; height: 16px; border-radius: 4px; border: 2px solid #cbd5e1; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
+.pos-opt.sel .pos-chk { background: #2563eb; border-color: #2563eb; color: white; }
+
+.section-weights { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px; }
+.sw-item { padding: 14px 16px; border: 1.5px solid #e2e8f0; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; }
+.sw-label { font-size: 13px; font-weight: 700; }
+.sw-desc { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+.sw-inp { width: 60px; padding: 7px 8px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 15px; font-weight: 700; text-align: center; font-family: inherit; color: #1e293b; }
+.sw-inp:focus { outline: none; border-color: #2563eb; }
+
+.alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 8px; }
+.alert-info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+.alert-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+.checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+.cb-item { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.18s; user-select: none; }
+.cb-item:hover { border-color: #93c5fd; background: #f8faff; }
+.cb-item.checked { border-color: #2563eb; background: #eff6ff; }
+.cb-box { width: 18px; height: 18px; border: 2px solid #cbd5e1; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 11px; color: transparent; transition: all 0.18s; }
+.cb-item.checked .cb-box { background: #2563eb; border-color: #2563eb; color: white; }
+.cb-text { font-size: 13px; font-weight: 500; }
+.cb-cat { font-size: 11px; color: #94a3b8; margin-top: 1px; }
+
+.sel-list { display: flex; flex-direction: column; gap: 8px; }
+.ind-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border: 1.5px solid #dbeafe; border-radius: 8px; background: #f8faff; }
+.ind-name { flex: 1; font-size: 13px; font-weight: 600; }
+.ind-cat { font-size: 11px; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.wt-ctrl { display: flex; align-items: center; gap: 6px; }
+.wt-ctrl span { font-size: 12px; color: #64748b; }
+.wt-inp { width: 66px; padding: 6px 8px; border: 1.5px solid #e2e8f0; border-radius: 6px; font-size: 14px; font-weight: 700; text-align: center; font-family: inherit; }
+.wt-inp:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+.wt-total { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 8px; background: #f8faff; border: 1px solid #e2e8f0; margin-top: 14px; }
+.wt-lbl { font-size: 12px; font-weight: 700; color: #64748b; white-space: nowrap; min-width: 100px; }
+.wt-bar-bg { flex: 1; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+.wt-bar { height: 100%; background: #2563eb; border-radius: 4px; transition: width 0.3s, background 0.3s; }
+.wt-bar.over { background: #ef4444; }
+.wt-bar.done { background: #10b981; }
+.wt-num { font-size: 14px; font-weight: 800; min-width: 50px; text-align: right; }
+.wt-num.over { color: #ef4444; }
+.wt-num.done { color: #10b981; }
+
+.kpa-sel-box { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; padding: 16px; background: #f8faff; border-radius: 10px; border: 1.5px dashed #93c5fd; margin-bottom: 14px; }
+.kpa-list { display: flex; flex-direction: column; gap: 8px; }
+.kpa-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px; background: white; }
+.kpa-num { width: 24px; height: 24px; border-radius: 50%; background: #eff6ff; color: #2563eb; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.kpa-info { flex: 1; }
+.kpa-l1t { font-size: 11px; color: #94a3b8; font-weight: 600; }
+.kpa-l2t { font-size: 13px; font-weight: 600; margin-top: 1px; }
+.kpa-del { color: #fca5a5; cursor: pointer; font-size: 18px; line-height: 1; padding: 2px; }
+.kpa-del:hover { color: #ef4444; }
+.kpa-empty { text-align: center; padding: 28px; color: #cbd5e1; font-size: 13px; }
+.kpa-cnt { font-size: 12px; color: #94a3b8; margin-bottom: 8px; }
+
+.divider { height: 1px; background: #f1f5f9; margin: 16px 0; }
+.sec-lbl { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+
+.btn { padding: 10px 22px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: all 0.18s; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: #2563eb; color: white; }
+.btn-primary:hover { background: #1d4ed8; box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+.btn-primary:disabled { background: #93c5fd; cursor: not-allowed; box-shadow: none; }
+.btn-secondary { background: white; color: #475569; border: 1.5px solid #e2e8f0; }
+.btn-secondary:hover { background: #f8faff; border-color: #cbd5e1; }
+.btn-success { background: #10b981; color: white; }
+.btn-success:hover { background: #059669; box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
+.btn-success:disabled { background: #6ee7b7; cursor: not-allowed; box-shadow: none; }
+.btn-add { background: #eff6ff; color: #2563eb; border: 1.5px solid #93c5fd; padding: 10px 16px; font-size: 13px; }
+.btn-add:hover { background: #dbeafe; }
+.btn-add:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+
+/* Summary */
+.info-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 20px; }
+.ic { padding: 13px; background: #f8faff; border-radius: 8px; border: 1px solid #e2e8f0; }
+.ic-lbl { font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; }
+.ic-val { font-size: 13px; font-weight: 700; margin-top: 5px; }
+.sum-section { margin-bottom: 20px; }
+.sum-title { font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+.badge { display: inline-flex; padding: 2px 9px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+.badge-kpi { background: #eff6ff; color: #2563eb; }
+.badge-kpa { background: #f0fdf4; color: #059669; }
+.sum-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sum-table th { background: #f8faff; padding: 10px 13px; text-align: left; font-weight: 700; color: #64748b; border-bottom: 2px solid #e8edf4; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; }
+.sum-table td { padding: 10px 13px; border-bottom: 1px solid #f1f5f9; }
+.sum-table tr:hover td { background: #fafbff; }
+.wc { font-weight: 700; color: #2563eb; text-align: center; }
+.rwc { font-weight: 800; color: #10b981; text-align: center; }
+.total-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 10px; }
+.total-lbl { font-size: 14px; font-weight: 700; color: #166534; }
+.total-val { font-size: 24px; font-weight: 900; color: #059669; }
+
+/* Loading & states */
+.loading-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 16px; }
+.spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: #64748b; }
+
+.success-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 16px; text-align: center; }
+.success-icon { width: 64px; height: 64px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: white; }
+.success-title { font-size: 20px; font-weight: 700; color: #1e293b; }
+.success-sub { font-size: 13px; color: #64748b; }
+
+.hidden { display: none !important; }
+
+@media print {
+  .steps-bar, .actions, .kpa-sel-box, .kpa-del, .wt-ctrl { display: none !important; }
+  body { background: white !important; }
+  .card { box-shadow: none !important; border: 1px solid #e2e8f0; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>KPI &amp; KPA 考核指标设立</h1>
+  <p>关键绩效指标 · 关键过程领域 | 绩效考核管理平台</p>
+</div>
+
+<div class="steps-bar" id="steps-bar">
+  <div class="step-item active" id="snav-1"><div class="step-num">1</div>基本信息</div>
+  <div class="step-item"        id="snav-2"><div class="step-num">2</div>KPI 指标</div>
+  <div class="step-item"        id="snav-3"><div class="step-num">3</div>KPA 指标</div>
+  <div class="step-item"        id="snav-4"><div class="step-num">4</div>汇总确认</div>
+</div>
+
+<div class="main">
+
+  <!-- Loading -->
+  <div class="loading-screen" id="screen-loading">
+    <div class="spinner"></div>
+    <div class="loading-text">正在加载指标库…</div>
+  </div>
+
+  <!-- Error -->
+  <div class="hidden" id="screen-error">
+    <div class="card" style="text-align:center;padding:48px;">
+      <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px;">加载失败</div>
+      <div style="font-size:13px;color:#64748b;margin-bottom:20px;">无法连接到数据库，请检查网络或 config.js 配置。</div>
+      <button class="btn btn-primary" onclick="location.reload()">重新加载</button>
+    </div>
+  </div>
+
+  <!-- Success -->
+  <div class="success-screen hidden" id="screen-success">
+    <div class="success-icon">✓</div>
+    <div class="success-title">提交成功！</div>
+    <div class="success-sub">考核指标已记录，管理员可在后台查看。</div>
+    <button class="btn btn-primary" style="margin-top:8px;" onclick="resetForm()">提交新的考核</button>
+  </div>
+
+  <!-- Main App -->
+  <div class="hidden" id="screen-app">
+
+    <!-- STEP 1 -->
+    <div id="step-1">
+      <div class="card">
+        <div class="card-title">基本信息</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Hub 名称</label>
+            <select id="hub"></select>
+          </div>
+          <div class="form-group">
+            <label>仓长姓名</label>
+            <input type="text" id="assessor" placeholder="填写仓长姓名" />
+          </div>
+          <div class="form-group">
+            <label>被考核人</label>
+            <input type="text" id="person" placeholder="填写被考核人姓名" />
+          </div>
+          <div class="form-group">
+            <label>考核周期</label>
+            <select id="period"></select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>岗位（多选）</label>
+          <div class="tag-select-wrap">
+            <div class="tag-select" id="tag-sel" onclick="togglePosDD(event)">
+              <span class="tag-ph" id="tag-ph">点击选择岗位…</span>
+            </div>
+            <div class="pos-dd hidden" id="pos-dd"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">考核权重配置</div>
+        <div class="alert alert-info">设定 KPI 与 KPA 各占总考核的比例，两者联动、合计须为 100%。</div>
+        <div class="section-weights">
+          <div class="sw-item">
+            <div><div class="sw-label">KPI 指标权重</div><div class="sw-desc">关键绩效指标</div></div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <input type="number" class="sw-inp" id="kpi-sw" value="70" min="0" max="100" oninput="syncSW('kpi')">
+              <span style="font-size:13px;color:#64748b;font-weight:700;">%</span>
+            </div>
+          </div>
+          <div class="sw-item">
+            <div><div class="sw-label">KPA 指标权重</div><div class="sw-desc">关键过程领域</div></div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <input type="number" class="sw-inp" id="kpa-sw" value="30" min="0" max="100" oninput="syncSW('kpa')">
+              <span style="font-size:13px;color:#64748b;font-weight:700;">%</span>
+            </div>
+          </div>
+        </div>
+        <div class="alert alert-error hidden" id="sw-err">KPI 与 KPA 权重之和须等于 100%</div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="go(2)">下一步：KPI 指标 →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div id="step-2" class="hidden">
+      <div class="card">
+        <div class="card-title">KPI 指标确认</div>
+        <div class="alert alert-info">从指标库中勾选适用的 KPI 指标，为每项设置内部权重，合计须等于 100%。</div>
+        <div class="sec-lbl">可选指标库</div>
+        <div class="checkbox-grid" id="kpi-grid"></div>
+        <div id="kpi-sel-block" class="hidden">
+          <div class="divider"></div>
+          <div class="sec-lbl">已选指标 &amp; 权重设置</div>
+          <div class="sel-list" id="kpi-sel-list"></div>
+          <div class="wt-total">
+            <div class="wt-lbl">KPI 内部权重合计</div>
+            <div class="wt-bar-bg"><div class="wt-bar" id="kpi-bar" style="width:0%"></div></div>
+            <div class="wt-num" id="kpi-total">0%</div>
+          </div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-secondary" onclick="go(1)">← 上一步</button>
+        <button class="btn btn-primary" onclick="go(3)">下一步：KPA 指标 →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div id="step-3" class="hidden">
+      <div class="card">
+        <div class="card-title">KPA 指标确认</div>
+        <div class="alert alert-info">选择一级指标后从二级指标中添加条目（最多 6 条），为每条设置内部权重，合计须等于 100%。</div>
+        <div class="kpa-sel-box">
+          <div class="form-group">
+            <label>一级指标</label>
+            <select id="kpa-l1" onchange="onL1Change()">
+              <option value="">— 选择一级指标 —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>二级指标</label>
+            <select id="kpa-l2">
+              <option value="">— 先选择一级指标 —</option>
+            </select>
+          </div>
+          <button class="btn btn-add" id="kpa-add-btn" onclick="addKpa()">+ 添加</button>
+        </div>
+        <div class="kpa-cnt" id="kpa-cnt"></div>
+        <div class="kpa-list" id="kpa-list">
+          <div class="kpa-empty">暂未添加 KPA 指标，请从上方选择后点击添加</div>
+        </div>
+        <div class="wt-total" style="margin-top:14px;">
+          <div class="wt-lbl">KPA 内部权重合计</div>
+          <div class="wt-bar-bg"><div class="wt-bar" id="kpa-bar" style="width:0%"></div></div>
+          <div class="wt-num" id="kpa-total">0%</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-secondary" onclick="go(2)">← 上一步</button>
+        <button class="btn btn-primary" onclick="go(4)">下一步：汇总确认 →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div id="step-4" class="hidden">
+      <div class="card">
+        <div class="card-title">汇总确认</div>
+        <div id="summary-body"></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-secondary" onclick="go(3)">← 上一步</button>
+        <button class="btn btn-primary" onclick="window.print()">🖨 打印</button>
+        <button class="btn btn-success" id="submit-btn" onclick="doSubmit()">✓ 确认提交</button>
+      </div>
+    </div>
+
+  </div><!-- #screen-app -->
+</div>
+
+<script>
+const { createClient } = window.supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── Global data loaded from Supabase ──
+let KPI_DATA = [];
+let L1_DATA  = [];
+let L2_DATA  = [];
+
+// ── State ──
+const S = {
+  hub: '', assessor: '', person: '', period: '',
+  positions: [], kpiSW: 70, kpaSW: 30,
+  kpis: {},  // id → { name, cat, weight }
+  kpas: [],  // [{ l1, l2, weight }]
+};
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+async function init() {
+  try {
+    const [kr, l1r, l2r] = await Promise.all([
+      sb.from('kpi_indicators').select('*').eq('is_active', true).order('sort_order'),
+      sb.from('kpa_l1').select('*').eq('is_active', true).order('sort_order'),
+      sb.from('kpa_l2').select('*').eq('is_active', true).order('sort_order'),
+    ]);
+    if (kr.error || l1r.error || l2r.error) throw kr.error || l1r.error || l2r.error;
+    KPI_DATA = kr.data  || [];
+    L1_DATA  = l1r.data || [];
+    L2_DATA  = l2r.data || [];
+
+    buildSelects();
+    buildPosDD();
+    buildKpiGrid();
+    buildKpaL1();
+
+    document.getElementById('screen-loading').style.display = 'none';
+    document.getElementById('screen-app').classList.remove('hidden');
+  } catch(e) {
+    console.error(e);
+    document.getElementById('screen-loading').style.display = 'none';
+    document.getElementById('screen-error').classList.remove('hidden');
+  }
+}
+
+function buildSelects() {
+  const hubSel = document.getElementById('hub');
+  hubSel.innerHTML = '<option value="">— 请选择 Hub —</option>';
+  HUB_LIST.forEach(h => { const o = document.createElement('option'); o.value = h; o.textContent = h; hubSel.appendChild(o); });
+
+  const perSel = document.getElementById('period');
+  PERIOD_LIST.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; perSel.appendChild(o); });
+}
+
+// ── Positions ──
+function buildPosDD() {
+  const dd = document.getElementById('pos-dd');
+  POSITION_LIST.forEach(p => {
+    const d = document.createElement('div');
+    d.className = 'pos-opt'; d.dataset.p = p;
+    d.innerHTML = `<div class="pos-chk">✓</div>${p}`;
+    d.onclick = e => { e.stopPropagation(); togglePos(p); };
+    dd.appendChild(d);
+  });
+  document.addEventListener('click', () => {
+    document.getElementById('pos-dd').classList.add('hidden');
+    document.getElementById('tag-sel').classList.remove('open');
+  });
+}
+function togglePosDD(e) {
+  e.stopPropagation();
+  document.getElementById('pos-dd').classList.toggle('hidden');
+  document.getElementById('tag-sel').classList.toggle('open');
+}
+function togglePos(p) {
+  const i = S.positions.indexOf(p);
+  if (i >= 0) S.positions.splice(i, 1); else S.positions.push(p);
+  renderPosTags();
+  document.querySelectorAll('.pos-opt').forEach(d => d.classList.toggle('sel', S.positions.includes(d.dataset.p)));
+}
+function renderPosTags() {
+  const ts = document.getElementById('tag-sel');
+  const ph = document.getElementById('tag-ph');
+  ts.querySelectorAll('.tag').forEach(t => t.remove());
+  ph.style.display = S.positions.length ? 'none' : '';
+  S.positions.forEach(p => {
+    const t = document.createElement('div'); t.className = 'tag';
+    t.innerHTML = `${p}<span class="tag-x" onclick="event.stopPropagation();togglePos('${p}')">×</span>`;
+    ts.insertBefore(t, ph);
+  });
+}
+
+// ── Section weights ──
+function syncSW(which) {
+  const ki = document.getElementById('kpi-sw'), kai = document.getElementById('kpa-sw');
+  const v = Math.min(100, Math.max(0, parseInt((which==='kpi'?ki:kai).value)||0));
+  if (which==='kpi') { ki.value=v; kai.value=100-v; } else { kai.value=v; ki.value=100-v; }
+  S.kpiSW = parseInt(ki.value); S.kpaSW = parseInt(kai.value);
+  document.getElementById('sw-err').classList.toggle('hidden', S.kpiSW+S.kpaSW===100);
+}
+
+// ── KPI ──
+function buildKpiGrid() {
+  const g = document.getElementById('kpi-grid'); g.innerHTML = '';
+  KPI_DATA.forEach(k => {
+    const d = document.createElement('div'); d.className = 'cb-item'; d.id = `cb-${k.id}`;
+    d.innerHTML = `<div class="cb-box">✓</div><div><div class="cb-text">${k.name}</div><div class="cb-cat">${k.category}</div></div>`;
+    d.onclick = () => toggleKpi(k);
+    g.appendChild(d);
+  });
+}
+function toggleKpi(k) {
+  const el = document.getElementById(`cb-${k.id}`);
+  if (S.kpis[k.id]) { delete S.kpis[k.id]; el.classList.remove('checked'); }
+  else { S.kpis[k.id] = { name: k.name, cat: k.category, weight: 0 }; el.classList.add('checked'); }
+  renderKpiSel();
+}
+function renderKpiSel() {
+  const keys = Object.keys(S.kpis);
+  const block = document.getElementById('kpi-sel-block');
+  const list  = document.getElementById('kpi-sel-list');
+  if (!keys.length) { block.classList.add('hidden'); return; }
+  block.classList.remove('hidden'); list.innerHTML = '';
+  keys.forEach(id => {
+    const k = S.kpis[id], r = document.createElement('div'); r.className = 'ind-row';
+    r.innerHTML = `<div class="ind-name">${k.name}</div><div class="ind-cat">${k.cat}</div>
+      <div class="wt-ctrl"><span>权重</span>
+        <input type="number" class="wt-inp" value="${k.weight}" min="0" max="100" placeholder="0"
+          oninput="S.kpis['${id}'].weight=parseFloat(this.value)||0;updKpiTotal()">
+        <span>%</span></div>`;
+    list.appendChild(r);
+  });
+  updKpiTotal();
+}
+function updKpiTotal() {
+  setBar('kpi-bar','kpi-total', Object.values(S.kpis).reduce((a,k)=>a+(k.weight||0),0));
+}
+
+// ── KPA ──
+function buildKpaL1() {
+  const sel = document.getElementById('kpa-l1');
+  L1_DATA.forEach(l1 => { const o=document.createElement('option'); o.value=l1.id+'|'+l1.name; o.textContent=l1.name; sel.appendChild(o); });
+}
+function onL1Change() {
+  const val = document.getElementById('kpa-l1').value;
+  const sel  = document.getElementById('kpa-l2');
+  sel.innerHTML = '';
+  if (!val) { sel.innerHTML='<option value="">— 先选择一级指标 —</option>'; return; }
+  const l1id = val.split('|')[0];
+  sel.innerHTML = '<option value="">— 选择二级指标 —</option>';
+  L2_DATA.filter(l2=>l2.l1_id===l1id).forEach(l2 => {
+    const o=document.createElement('option'); o.value=l2.name; o.textContent=l2.name; sel.appendChild(o);
+  });
+}
+function addKpa() {
+  const l1v = document.getElementById('kpa-l1').value;
+  const l2v = document.getElementById('kpa-l2').value;
+  if (!l1v || !l2v) { alert('请选择一级指标和二级指标'); return; }
+  if (S.kpas.length >= 6) { alert('最多添加 6 条 KPA 指标'); return; }
+  const l1name = l1v.split('|')[1];
+  if (S.kpas.find(x=>x.l1===l1name&&x.l2===l2v)) { alert('该指标已添加，请勿重复'); return; }
+  S.kpas.push({ l1: l1name, l2: l2v, weight: 0 });
+  renderKpaList();
+}
+function delKpa(i) { S.kpas.splice(i,1); renderKpaList(); }
+function renderKpaList() {
+  const list = document.getElementById('kpa-list');
+  const cnt  = document.getElementById('kpa-cnt');
+  const btn  = document.getElementById('kpa-add-btn');
+  cnt.textContent = `已添加 ${S.kpas.length} / 6 条`;
+  btn.disabled = S.kpas.length >= 6;
+  if (!S.kpas.length) { list.innerHTML='<div class="kpa-empty">暂未添加 KPA 指标，请从上方选择后点击添加</div>'; updKpaTotal(); return; }
+  list.innerHTML = '';
+  S.kpas.forEach((item,idx) => {
+    const r = document.createElement('div'); r.className = 'kpa-row';
+    r.innerHTML = `<div class="kpa-num">${idx+1}</div>
+      <div class="kpa-info"><div class="kpa-l1t">${item.l1}</div><div class="kpa-l2t">${item.l2}</div></div>
+      <div class="wt-ctrl"><span>权重</span>
+        <input type="number" class="wt-inp" value="${item.weight}" min="0" max="100" placeholder="0"
+          oninput="S.kpas[${idx}].weight=parseFloat(this.value)||0;updKpaTotal()">
+        <span>%</span></div>
+      <div class="kpa-del" onclick="delKpa(${idx})">✕</div>`;
+    list.appendChild(r);
+  });
+  updKpaTotal();
+}
+function updKpaTotal() {
+  setBar('kpa-bar','kpa-total', S.kpas.reduce((a,x)=>a+(x.weight||0),0));
+}
+
+// ── Shared bar helper ──
+function setBar(barId, numId, total) {
+  const bar = document.getElementById(barId), num = document.getElementById(numId);
+  bar.style.width = Math.min(total,100)+'%';
+  bar.className = 'wt-bar'+(total>100?' over':total===100?' done':'');
+  num.textContent = total+'%';
+  num.className = 'wt-num'+(total>100?' over':total===100?' done':'');
+}
+
+// ══════════════════════════════════════════
+// NAVIGATION & VALIDATION
+// ══════════════════════════════════════════
+function go(n) {
+  if (n>1 && !v1()) return;
+  if (n>2 && !v2()) return;
+  if (n>3 && !v3()) return;
+  [1,2,3,4].forEach(i => {
+    document.getElementById(`step-${i}`).classList.toggle('hidden', i!==n);
+    const nav = document.getElementById(`snav-${i}`);
+    nav.className = 'step-item'+(i===n?' active':i<n?' done':'');
+    if (i<n) nav.onclick = ()=>go(i); else nav.onclick = null;
+  });
+  if (n===4) buildSummary();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function v1() {
+  if (!document.getElementById('hub').value) { alert('请选择 Hub 名称'); return false; }
+  if (!document.getElementById('assessor').value.trim()) { alert('请填写仓长姓名'); return false; }
+  if (!document.getElementById('person').value.trim()) { alert('请填写被考核人姓名'); return false; }
+  if (!S.positions.length) { alert('请至少选择一个岗位'); return false; }
+  if (S.kpiSW+S.kpaSW!==100) { alert('KPI 与 KPA 权重之和须等于 100%'); return false; }
+  S.hub = document.getElementById('hub').value;
+  S.assessor = document.getElementById('assessor').value.trim();
+  S.person = document.getElementById('person').value.trim();
+  S.period = document.getElementById('period').value;
+  return true;
+}
+function v2() {
+  if (!Object.keys(S.kpis).length) { alert('请至少勾选一项 KPI 指标'); return false; }
+  const t = Object.values(S.kpis).reduce((a,k)=>a+(k.weight||0),0);
+  if (t!==100) { alert(`KPI 内部权重合计须为 100%，当前 ${t}%`); return false; }
+  return true;
+}
+function v3() {
+  if (!S.kpas.length) { alert('请至少添加一条 KPA 指标'); return false; }
+  const t = S.kpas.reduce((a,x)=>a+(x.weight||0),0);
+  if (t!==100) { alert(`KPA 内部权重合计须为 100%，当前 ${t}%`); return false; }
+  return true;
+}
+
+// ── Summary ──
+function buildSummary() {
+  const kw=S.kpiSW, pw=S.kpaSW;
+  let h = `<div class="info-grid">
+    <div class="ic"><div class="ic-lbl">Hub</div><div class="ic-val">${S.hub}</div></div>
+    <div class="ic"><div class="ic-lbl">仓长</div><div class="ic-val">${S.assessor}</div></div>
+    <div class="ic"><div class="ic-lbl">被考核人</div><div class="ic-val">${S.person}</div></div>
+    <div class="ic"><div class="ic-lbl">岗位</div><div class="ic-val" style="font-size:12px;">${S.positions.join('、')}</div></div>
+  </div>
+  <div class="info-grid" style="grid-template-columns:1fr 1fr 1fr;">
+    <div class="ic"><div class="ic-lbl">考核周期</div><div class="ic-val">${S.period}</div></div>
+    <div class="ic"><div class="ic-lbl">KPI 总占比</div><div class="ic-val" style="color:#2563eb;">${kw}%</div></div>
+    <div class="ic"><div class="ic-lbl">KPA 总占比</div><div class="ic-val" style="color:#059669;">${pw}%</div></div>
+  </div>`;
+
+  h += `<div class="sum-section"><div class="sum-title"><span class="badge badge-kpi">KPI</span> 关键绩效指标</div>
+    <table class="sum-table"><thead><tr>
+      <th width="32">#</th><th>指标名称</th><th width="80">分类</th>
+      <th width="110" style="text-align:center;">KPI内部权重</th>
+      <th width="120" style="text-align:center;">占总考核权重</th>
+    </tr></thead><tbody>`;
+  let ki=0;
+  for (const [,k] of Object.entries(S.kpis)) {
+    ki++;
+    h += `<tr><td style="color:#94a3b8;">${ki}</td><td style="font-weight:600;">${k.name}</td>
+      <td><span style="background:#f1f5f9;color:#64748b;padding:2px 8px;border-radius:10px;font-size:11px;">${k.cat}</span></td>
+      <td class="wc">${k.weight}%</td><td class="rwc">${((k.weight/100)*kw).toFixed(1)}%</td></tr>`;
+  }
+  h += `</tbody></table></div>`;
+
+  h += `<div class="sum-section"><div class="sum-title"><span class="badge badge-kpa">KPA</span> 关键过程领域</div>
+    <table class="sum-table"><thead><tr>
+      <th width="32">#</th><th width="120">一级指标</th><th>二级指标</th>
+      <th width="110" style="text-align:center;">KPA内部权重</th>
+      <th width="120" style="text-align:center;">占总考核权重</th>
+    </tr></thead><tbody>`;
+  S.kpas.forEach((x,idx) => {
+    h += `<tr><td style="color:#94a3b8;">${idx+1}</td>
+      <td><span style="background:#f0fdf4;color:#059669;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${x.l1}</span></td>
+      <td style="font-weight:600;">${x.l2}</td>
+      <td class="wc">${x.weight}%</td><td class="rwc">${((x.weight/100)*pw).toFixed(1)}%</td></tr>`;
+  });
+  h += `</tbody></table></div>`;
+  h += `<div class="total-row"><div class="total-lbl">总考核权重合计</div><div class="total-val">100%</div></div>`;
+  document.getElementById('summary-body').innerHTML = h;
+}
+
+// ══════════════════════════════════════════
+// SUBMIT
+// ══════════════════════════════════════════
+async function doSubmit() {
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = '提交中…';
+  try {
+    const { data: ass, error: e1 } = await sb.from('assessments').insert({
+      hub: S.hub, assessor: S.assessor, assessed_person: S.person,
+      positions: S.positions, period: S.period,
+      kpi_section_weight: S.kpiSW, kpa_section_weight: S.kpaSW,
+    }).select().single();
+    if (e1) throw e1;
+
+    const kpiRows = Object.values(S.kpis).map(k=>({ assessment_id:ass.id, kpi_name:k.name, category:k.cat, weight:k.weight }));
+    const { error: e2 } = await sb.from('assessment_kpis').insert(kpiRows);
+    if (e2) throw e2;
+
+    const kpaRows = S.kpas.map(x=>({ assessment_id:ass.id, l1_name:x.l1, l2_name:x.l2, weight:x.weight }));
+    const { error: e3 } = await sb.from('assessment_kpas').insert(kpaRows);
+    if (e3) throw e3;
+
+    showSuccess();
+  } catch(err) {
+    alert('提交失败：' + (err.message || '请重试'));
+    btn.disabled = false; btn.textContent = '✓ 确认提交';
+  }
+}
+
+function showSuccess() {
+  document.getElementById('screen-app').classList.add('hidden');
+  document.getElementById('steps-bar').style.display = 'none';
+  document.getElementById('screen-success').classList.remove('hidden');
+}
+
+function resetForm() {
+  // Reset state
+  S.hub=''; S.assessor=''; S.person=''; S.period=''; S.positions=[];
+  S.kpiSW=70; S.kpaSW=30; S.kpis={}; S.kpas=[];
+  // Reset UI
+  document.getElementById('hub').value='';
+  document.getElementById('assessor').value='';
+  document.getElementById('person').value='';
+  document.getElementById('kpi-sw').value=70;
+  document.getElementById('kpa-sw').value=30;
+  document.querySelectorAll('.cb-item.checked').forEach(el=>el.classList.remove('checked'));
+  document.getElementById('kpi-sel-block').classList.add('hidden');
+  S.positions=[]; renderPosTags();
+  document.querySelectorAll('.pos-opt').forEach(d=>d.classList.remove('sel'));
+  S.kpas=[]; renderKpaList();
+  // Show app again
+  document.getElementById('screen-success').classList.add('hidden');
+  document.getElementById('steps-bar').style.display='';
+  document.getElementById('screen-app').classList.remove('hidden');
+  go(1);
+  document.getElementById('submit-btn').disabled=false;
+  document.getElementById('submit-btn').textContent='✓ 确认提交';
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

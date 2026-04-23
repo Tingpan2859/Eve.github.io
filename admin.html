@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台 — KPI/KPA 考核系统</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f0f4f8; color: #1e293b; min-height: 100vh; }
+
+/* Login */
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.login-box { background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); padding: 40px; width: 360px; }
+.login-logo { text-align: center; margin-bottom: 28px; }
+.login-logo h1 { font-size: 18px; font-weight: 700; color: #1e293b; margin-top: 12px; }
+.login-logo p { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+.login-icon { width: 56px; height: 56px; background: linear-gradient(135deg,#1e3a5f,#1d4ed8); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 0 auto; }
+
+/* Admin layout */
+.admin-header { background: linear-gradient(135deg,#1e3a5f,#1d4ed8); color: white; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.admin-header h1 { font-size: 16px; font-weight: 700; }
+.admin-header .user-info { font-size: 12px; opacity: 0.8; display: flex; align-items: center; gap: 16px; }
+
+.tab-bar { background: white; border-bottom: 1px solid #e2e8f0; padding: 0 28px; display: flex; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+.tab-btn { padding: 13px 20px; font-size: 13px; font-weight: 600; color: #94a3b8; border-bottom: 3px solid transparent; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.tab-btn.active { color: #2563eb; border-bottom-color: #2563eb; }
+.tab-btn:hover:not(.active) { color: #64748b; }
+
+.content { max-width: 1000px; margin: 24px auto; padding: 0 24px 60px; }
+
+.card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); padding: 24px 28px; margin-bottom: 18px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid #f1f5f9; }
+.card-head h2 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.card-head h2::before { content:''; display:inline-block; width:4px; height:18px; background:#2563eb; border-radius:2px; }
+
+/* Tables */
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { background: #f8faff; padding: 10px 14px; text-align: left; font-weight: 700; color: #64748b; border-bottom: 2px solid #e8edf4; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+.tbl td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.tbl tr:hover td { background: #fafbff; }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl-empty { text-align:center; padding:32px; color:#cbd5e1; font-size:13px; }
+
+/* Badges & tags */
+.badge { display:inline-flex; padding:2px 9px; border-radius:4px; font-size:11px; font-weight:700; }
+.badge-on  { background:#f0fdf4; color:#059669; }
+.badge-off { background:#fef2f2; color:#991b1b; }
+.cat-tag { background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:10px; font-size:11px; }
+.l1-tag  { background:#f0fdf4; color:#059669; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+
+/* Buttons */
+.btn { padding:8px 18px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; border:none; transition:all 0.18s; font-family:inherit; display:inline-flex; align-items:center; gap:5px; }
+.btn-primary   { background:#2563eb; color:white; }
+.btn-primary:hover   { background:#1d4ed8; }
+.btn-secondary { background:white; color:#475569; border:1.5px solid #e2e8f0; }
+.btn-secondary:hover { background:#f8faff; }
+.btn-danger    { background:#fef2f2; color:#991b1b; border:1.5px solid #fecaca; }
+.btn-danger:hover    { background:#fee2e2; }
+.btn-sm { padding:5px 12px; font-size:12px; }
+.btn-toggle-on  { background:#f0fdf4; color:#059669; border:1px solid #bbf7d0; font-size:12px; padding:4px 10px; }
+.btn-toggle-off { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; font-size:12px; padding:4px 10px; }
+.btn-link { background:none; border:none; color:#2563eb; font-size:12px; font-weight:600; cursor:pointer; padding:4px 8px; border-radius:4px; }
+.btn-link:hover { background:#eff6ff; }
+.btn-link-danger { color:#ef4444; }
+.btn-link-danger:hover { background:#fef2f2; }
+
+/* Forms */
+.form-group { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+.form-group:last-child { margin-bottom:0; }
+.form-group label { font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.4px; }
+.form-group input, .form-group select { padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:14px; color:#1e293b; font-family:inherit; transition:border-color 0.2s; }
+.form-group input:focus, .form-group select:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.1); }
+.form-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+/* Modal */
+.modal-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.4); backdrop-filter:blur(2px); z-index:500; display:flex; align-items:center; justify-content:center; padding:20px; }
+.modal-box { background:white; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,0.15); width:100%; max-width:480px; max-height:90vh; overflow-y:auto; }
+.modal-head { padding:20px 24px 16px; border-bottom:1px solid #f1f5f9; display:flex; align-items:center; justify-content:space-between; }
+.modal-head h3 { font-size:15px; font-weight:700; }
+.modal-close { background:none; border:none; font-size:20px; color:#94a3b8; cursor:pointer; line-height:1; padding:2px; }
+.modal-close:hover { color:#475569; }
+.modal-body { padding:20px 24px; }
+.modal-foot { padding:16px 24px; border-top:1px solid #f1f5f9; display:flex; justify-content:flex-end; gap:10px; }
+
+/* Submission detail */
+.det-info { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+.det-cell { padding:12px; background:#f8faff; border-radius:8px; border:1px solid #e2e8f0; }
+.det-cell-lbl { font-size:11px; color:#94a3b8; font-weight:700; text-transform:uppercase; }
+.det-cell-val { font-size:13px; font-weight:700; margin-top:4px; }
+.det-table { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:14px; }
+.det-table th { background:#f8faff; padding:8px 12px; text-align:left; font-weight:700; font-size:11px; color:#64748b; border-bottom:2px solid #e2e8f0; text-transform:uppercase; }
+.det-table td { padding:8px 12px; border-bottom:1px solid #f1f5f9; }
+.det-table tr:last-child td { border-bottom:none; }
+.wc { font-weight:700; color:#2563eb; text-align:center; }
+.rwc { font-weight:700; color:#10b981; text-align:center; }
+
+/* KPA accordion */
+.l1-block { border:1.5px solid #e2e8f0; border-radius:10px; margin-bottom:10px; overflow:hidden; }
+.l1-head { display:flex; align-items:center; gap:10px; padding:12px 16px; background:#f8faff; cursor:pointer; user-select:none; }
+.l1-head:hover { background:#f0f6ff; }
+.l1-name { flex:1; font-size:14px; font-weight:700; }
+.l1-chevron { font-size:12px; color:#94a3b8; transition:transform 0.2s; }
+.l1-block.open .l1-chevron { transform:rotate(90deg); }
+.l2-list { border-top:1px solid #e2e8f0; padding:8px 0; display:none; }
+.l1-block.open .l2-list { display:block; }
+.l2-row { display:flex; align-items:center; gap:10px; padding:8px 16px 8px 36px; font-size:13px; }
+.l2-row:hover { background:#fafbff; }
+.l2-name { flex:1; }
+.l2-actions { display:flex; align-items:center; gap:4px; }
+.l2-add-row { padding:8px 16px 10px 36px; }
+
+/* Alerts */
+.alert { padding:10px 14px; border-radius:8px; font-size:13px; margin-bottom:14px; }
+.alert-info  { background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; }
+.alert-error { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+
+/* Loading spinner */
+.spinner { width:32px; height:32px; border:3px solid #e2e8f0; border-top-color:#2563eb; border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.loading-wrap { text-align:center; padding:40px; color:#64748b; font-size:13px; }
+.loading-wrap .spinner { margin-bottom:12px; }
+
+.hidden { display:none !important; }
+.actions-bar { display:flex; gap:8px; }
+</style>
+</head>
+<body>
+
+<!-- ════ LOGIN ════ -->
+<div class="login-wrap" id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-icon">🔐</div>
+      <h1>管理后台</h1>
+      <p>KPI &amp; KPA 考核指标管理系统</p>
+    </div>
+    <div class="form-group">
+      <label>管理员邮箱</label>
+      <input type="email" id="login-email" placeholder="admin@company.com" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="form-group">
+      <label>密码</label>
+      <input type="password" id="login-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="alert alert-error hidden" id="login-err"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px;" id="login-btn" onclick="doLogin()">登录</button>
+    <div style="font-size:12px;color:#94a3b8;margin-top:14px;text-align:center;">
+      首次使用？请在 Supabase Authentication → Users 创建管理员账户。
+    </div>
+  </div>
+</div>
+
+<!-- ════ ADMIN APP ════ -->
+<div class="hidden" id="admin-app">
+
+  <div class="admin-header">
+    <h1>⚙️ 管理后台 — KPI &amp; KPA 考核系统</h1>
+    <div class="user-info">
+      <span id="admin-email"></span>
+      <button class="btn btn-secondary btn-sm" onclick="doLogout()">退出登录</button>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-btn active" id="tab-btn-kpi"         onclick="showTab('kpi')">KPI 指标池</div>
+    <div class="tab-btn"        id="tab-btn-kpa"         onclick="showTab('kpa')">KPA 指标池</div>
+    <div class="tab-btn"        id="tab-btn-submissions" onclick="showTab('submissions')">提交记录</div>
+  </div>
+
+  <div class="content">
+
+    <!-- ── KPI TAB ── -->
+    <div id="tab-kpi">
+      <div class="card">
+        <div class="card-head">
+          <h2>KPI 指标池管理</h2>
+          <button class="btn btn-primary btn-sm" onclick="openModal('add-kpi')">+ 添加指标</button>
+        </div>
+        <div class="loading-wrap" id="kpi-loading"><div class="spinner"></div>加载中…</div>
+        <table class="tbl hidden" id="kpi-tbl">
+          <thead><tr>
+            <th width="36">#</th><th>指标名称</th><th width="100">分类</th>
+            <th width="80" style="text-align:center;">状态</th>
+            <th width="150" style="text-align:center;">操作</th>
+          </tr></thead>
+          <tbody id="kpi-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── KPA TAB ── -->
+    <div id="tab-kpa" class="hidden">
+      <div class="card">
+        <div class="card-head">
+          <h2>KPA 指标池管理</h2>
+          <button class="btn btn-primary btn-sm" onclick="openModal('add-l1')">+ 添加一级指标</button>
+        </div>
+        <div class="loading-wrap" id="kpa-loading"><div class="spinner"></div>加载中…</div>
+        <div id="kpa-accordion"></div>
+      </div>
+    </div>
+
+    <!-- ── SUBMISSIONS TAB ── -->
+    <div id="tab-submissions" class="hidden">
+      <div class="card">
+        <div class="card-head">
+          <h2>提交记录</h2>
+          <button class="btn btn-secondary btn-sm" onclick="loadSubmissions()">↻ 刷新</button>
+        </div>
+        <div class="loading-wrap" id="sub-loading"><div class="spinner"></div>加载中…</div>
+        <table class="tbl hidden" id="sub-tbl">
+          <thead><tr>
+            <th>提交时间</th><th>Hub</th><th>仓长</th><th>被考核人</th>
+            <th>岗位</th><th width="70" style="text-align:center;">KPI%</th>
+            <th width="70" style="text-align:center;">KPA%</th>
+            <th width="80" style="text-align:center;">操作</th>
+          </tr></thead>
+          <tbody id="sub-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- .content -->
+</div><!-- #admin-app -->
+
+<!-- ════ MODAL ════ -->
+<div class="modal-overlay hidden" id="modal" onclick="closeModalIfBg(event)">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modal-title">标题</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot" id="modal-foot"></div>
+  </div>
+</div>
+
+<script>
+const { createClient } = window.supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ══════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════
+async function checkSession() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) showDashboard(session.user.email);
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pwd   = document.getElementById('login-pwd').value;
+  const btn   = document.getElementById('login-btn');
+  const err   = document.getElementById('login-err');
+  if (!email || !pwd) { showErr(err,'请填写邮箱和密码'); return; }
+  btn.disabled=true; btn.textContent='登录中…'; err.classList.add('hidden');
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pwd });
+  if (error) { showErr(err, error.message); btn.disabled=false; btn.textContent='登录'; return; }
+  showDashboard(data.user.email);
+}
+
+function showDashboard(email) {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('admin-app').classList.remove('hidden');
+  document.getElementById('admin-email').textContent = email;
+  loadKpi();
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  location.reload();
+}
+
+function showErr(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
+
+// ══════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════
+let subLoaded = false;
+function showTab(t) {
+  ['kpi','kpa','submissions'].forEach(n => {
+    document.getElementById(`tab-${n}`).classList.toggle('hidden', n!==t);
+    document.getElementById(`tab-btn-${n}`).classList.toggle('active', n===t);
+  });
+  if (t==='kpa' && !document.getElementById('kpa-accordion').children.length) loadKpa();
+  if (t==='submissions' && !subLoaded) loadSubmissions();
+}
+
+// ══════════════════════════════════════════
+// KPI POOL
+// ══════════════════════════════════════════
+let kpiData = [];
+
+async function loadKpi() {
+  const { data } = await sb.from('kpi_indicators').select('*').order('sort_order').order('created_at');
+  kpiData = data || [];
+  renderKpiTable();
+  document.getElementById('kpi-loading').classList.add('hidden');
+  document.getElementById('kpi-tbl').classList.remove('hidden');
+}
+
+function renderKpiTable() {
+  const tb = document.getElementById('kpi-tbody'); tb.innerHTML='';
+  if (!kpiData.length) { tb.innerHTML=`<tr><td colspan="5" class="tbl-empty">暂无 KPI 指标，点击右上角添加</td></tr>`; return; }
+  kpiData.forEach((k,i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:#94a3b8;">${i+1}</td>
+      <td style="font-weight:600;">${k.name}</td>
+      <td><span class="cat-tag">${k.category}</span></td>
+      <td style="text-align:center;"><span class="badge ${k.is_active?'badge-on':'badge-off'}">${k.is_active?'启用':'停用'}</span></td>
+      <td style="text-align:center;">
+        <div class="actions-bar" style="justify-content:center;">
+          <button class="btn-link" onclick="openModal('edit-kpi','${k.id}')">编辑</button>
+          <button class="btn-link" onclick="toggleKpi('${k.id}',${!k.is_active})">${k.is_active?'停用':'启用'}</button>
+          <button class="btn-link btn-link-danger" onclick="deleteKpi('${k.id}')">删除</button>
+        </div>
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+
+async function toggleKpi(id, val) {
+  await sb.from('kpi_indicators').update({ is_active: val }).eq('id', id);
+  await loadKpi();
+}
+async function deleteKpi(id) {
+  if (!confirm('确认删除此 KPI 指标？')) return;
+  await sb.from('kpi_indicators').delete().eq('id', id);
+  await loadKpi();
+}
+
+// ══════════════════════════════════════════
+// KPA POOL
+// ══════════════════════════════════════════
+let l1Data=[], l2Data=[];
+
+async function loadKpa() {
+  const [r1,r2] = await Promise.all([
+    sb.from('kpa_l1').select('*').order('sort_order').order('created_at'),
+    sb.from('kpa_l2').select('*').order('sort_order').order('created_at'),
+  ]);
+  l1Data = r1.data||[]; l2Data = r2.data||[];
+  renderKpaAccordion();
+  document.getElementById('kpa-loading').classList.add('hidden');
+}
+
+function renderKpaAccordion() {
+  const acc = document.getElementById('kpa-accordion'); acc.innerHTML='';
+  if (!l1Data.length) { acc.innerHTML='<div class="tbl-empty">暂无 KPA 一级指标，点击右上角添加</div>'; return; }
+  l1Data.forEach(l1 => {
+    const l2s = l2Data.filter(x=>x.l1_id===l1.id);
+    const block = document.createElement('div'); block.className='l1-block'; block.id=`l1-${l1.id}`;
+    block.innerHTML = `
+      <div class="l1-head" onclick="toggleL1Block('${l1.id}')">
+        <span class="l1-name">${l1.name}</span>
+        <span class="badge ${l1.is_active?'badge-on':'badge-off'}">${l1.is_active?'启用':'停用'}</span>
+        <div class="actions-bar" onclick="event.stopPropagation()">
+          <button class="btn-link btn-sm" onclick="openModal('edit-l1','${l1.id}')">编辑</button>
+          <button class="btn-link btn-sm" onclick="toggleL1('${l1.id}',${!l1.is_active})">${l1.is_active?'停用':'启用'}</button>
+          <button class="btn-link btn-link-danger btn-sm" onclick="deleteL1('${l1.id}')">删除</button>
+        </div>
+        <span class="l1-chevron">▶</span>
+      </div>
+      <div class="l2-list">
+        ${l2s.map(l2=>`
+          <div class="l2-row">
+            <span class="l2-name">${l2.name}</span>
+            <span class="badge ${l2.is_active?'badge-on':'badge-off'}" style="font-size:10px;">${l2.is_active?'启用':'停用'}</span>
+            <div class="l2-actions">
+              <button class="btn-link btn-sm" onclick="openModal('edit-l2','${l2.id}')">编辑</button>
+              <button class="btn-link btn-sm" onclick="toggleL2('${l2.id}',${!l2.is_active})">${l2.is_active?'停用':'启用'}</button>
+              <button class="btn-link btn-link-danger btn-sm" onclick="deleteL2('${l2.id}')">删除</button>
+            </div>
+          </div>`).join('')}
+        <div class="l2-add-row">
+          <button class="btn btn-secondary btn-sm" onclick="openModal('add-l2','${l1.id}')">+ 添加二级指标</button>
+        </div>
+      </div>`;
+    acc.appendChild(block);
+  });
+}
+
+function toggleL1Block(id) {
+  document.getElementById(`l1-${id}`).classList.toggle('open');
+}
+async function toggleL1(id,val) {
+  await sb.from('kpa_l1').update({is_active:val}).eq('id',id);
+  await loadKpa();
+}
+async function deleteL1(id) {
+  if (!confirm('确认删除此一级指标及其所有二级指标？')) return;
+  await sb.from('kpa_l1').delete().eq('id',id);
+  await loadKpa();
+}
+async function toggleL2(id,val) {
+  await sb.from('kpa_l2').update({is_active:val}).eq('id',id);
+  await loadKpa();
+}
+async function deleteL2(id) {
+  if (!confirm('确认删除此二级指标？')) return;
+  await sb.from('kpa_l2').delete().eq('id',id);
+  await loadKpa();
+}
+
+// ══════════════════════════════════════════
+// SUBMISSIONS
+// ══════════════════════════════════════════
+let subData=[];
+
+async function loadSubmissions() {
+  subLoaded=true;
+  document.getElementById('sub-loading').classList.remove('hidden');
+  document.getElementById('sub-tbl').classList.add('hidden');
+  const { data } = await sb.from('assessments').select('*').order('created_at',{ascending:false});
+  subData = data||[];
+  renderSubTable();
+  document.getElementById('sub-loading').classList.add('hidden');
+  document.getElementById('sub-tbl').classList.remove('hidden');
+}
+
+function renderSubTable() {
+  const tb=document.getElementById('sub-tbody'); tb.innerHTML='';
+  if (!subData.length) { tb.innerHTML=`<tr><td colspan="8" class="tbl-empty">暂无提交记录</td></tr>`; return; }
+  subData.forEach(r => {
+    const dt = new Date(r.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const tr=document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:#94a3b8;white-space:nowrap;">${dt}</td>
+      <td style="font-weight:600;">${r.hub}</td>
+      <td>${r.assessor}</td>
+      <td style="font-weight:600;">${r.assessed_person}</td>
+      <td style="font-size:12px;">${(r.positions||[]).join('、')}</td>
+      <td style="text-align:center;font-weight:700;color:#2563eb;">${r.kpi_section_weight}%</td>
+      <td style="text-align:center;font-weight:700;color:#059669;">${r.kpa_section_weight}%</td>
+      <td style="text-align:center;">
+        <button class="btn-link" onclick="viewSubmission('${r.id}')">查看</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+
+async function viewSubmission(id) {
+  const ass = subData.find(r=>r.id===id);
+  const [kr,par] = await Promise.all([
+    sb.from('assessment_kpis').select('*').eq('assessment_id',id),
+    sb.from('assessment_kpas').select('*').eq('assessment_id',id),
+  ]);
+  const kpis=kr.data||[], kpas=par.data||[];
+  const kw=ass.kpi_section_weight, pw=ass.kpa_section_weight;
+
+  let body = `<div class="det-info">
+    <div class="det-cell"><div class="det-cell-lbl">Hub</div><div class="det-cell-val">${ass.hub}</div></div>
+    <div class="det-cell"><div class="det-cell-lbl">仓长</div><div class="det-cell-val">${ass.assessor}</div></div>
+    <div class="det-cell"><div class="det-cell-lbl">被考核人</div><div class="det-cell-val">${ass.assessed_person}</div></div>
+    <div class="det-cell"><div class="det-cell-lbl">岗位</div><div class="det-cell-val" style="font-size:12px;">${(ass.positions||[]).join('、')}</div></div>
+    <div class="det-cell"><div class="det-cell-lbl">考核周期</div><div class="det-cell-val">${ass.period}</div></div>
+    <div class="det-cell"><div class="det-cell-lbl">提交时间</div><div class="det-cell-val" style="font-size:12px;">${new Date(ass.created_at).toLocaleString('zh-CN')}</div></div>
+  </div>`;
+
+  body += `<div style="font-size:12px;font-weight:700;color:#2563eb;margin-bottom:6px;">KPI 指标（占总考核 ${kw}%）</div>
+  <table class="det-table"><thead><tr><th>指标名称</th><th>分类</th><th style="text-align:center;">内部权重</th><th style="text-align:center;">实际占比</th></tr></thead><tbody>
+  ${kpis.map(k=>`<tr><td style="font-weight:600;">${k.kpi_name}</td><td><span class="cat-tag">${k.category}</span></td><td class="wc">${k.weight}%</td><td class="rwc">${((k.weight/100)*kw).toFixed(1)}%</td></tr>`).join('')}
+  </tbody></table>`;
+
+  body += `<div style="font-size:12px;font-weight:700;color:#059669;margin-bottom:6px;">KPA 指标（占总考核 ${pw}%）</div>
+  <table class="det-table"><thead><tr><th>一级指标</th><th>二级指标</th><th style="text-align:center;">内部权重</th><th style="text-align:center;">实际占比</th></tr></thead><tbody>
+  ${kpas.map(p=>`<tr><td><span class="l1-tag">${p.l1_name}</span></td><td style="font-weight:600;">${p.l2_name}</td><td class="wc">${p.weight}%</td><td class="rwc">${((p.weight/100)*pw).toFixed(1)}%</td></tr>`).join('')}
+  </tbody></table>`;
+
+  body += `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:8px;">
+    <span style="font-weight:700;color:#166534;font-size:13px;">总权重合计</span>
+    <span style="font-weight:900;color:#059669;font-size:20px;">100%</span></div>`;
+
+  openModalRaw(`考核详情 — ${ass.assessed_person}`, body, [
+    `<button class="btn btn-secondary" onclick="closeModal()">关闭</button>`
+  ]);
+}
+
+// ══════════════════════════════════════════
+// MODAL
+// ══════════════════════════════════════════
+let modalCtx = null;
+
+function openModal(type, id='') {
+  modalCtx = { type, id };
+  const title = document.getElementById('modal-title');
+  const body  = document.getElementById('modal-body');
+  const foot  = document.getElementById('modal-foot');
+
+  if (type==='add-kpi' || type==='edit-kpi') {
+    const existing = kpiData.find(k=>k.id===id);
+    title.textContent = existing ? '编辑 KPI 指标' : '添加 KPI 指标';
+    body.innerHTML = `
+      <div class="form-group"><label>指标名称</label><input type="text" id="m-kpi-name" value="${existing?existing.name:''}" placeholder="例：月度销售额完成率"></div>
+      <div class="form-group"><label>分类</label><input type="text" id="m-kpi-cat" value="${existing?existing.category:''}" placeholder="例：销售、服务、项目…"></div>`;
+    foot.innerHTML = `<button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveKpi('${id}')">保存</button>`;
+
+  } else if (type==='add-l1' || type==='edit-l1') {
+    const existing = l1Data.find(l=>l.id===id);
+    title.textContent = existing ? '编辑一级指标' : '添加一级指标';
+    body.innerHTML = `<div class="form-group"><label>一级指标名称</label><input type="text" id="m-l1-name" value="${existing?existing.name:''}" placeholder="例：工作态度"></div>`;
+    foot.innerHTML = `<button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveL1('${id}')">保存</button>`;
+
+  } else if (type==='add-l2') {
+    const l1 = l1Data.find(l=>l.id===id);
+    title.textContent = `添加二级指标 — ${l1?l1.name:''}`;
+    body.innerHTML = `<div class="form-group"><label>二级指标名称</label><input type="text" id="m-l2-name" placeholder="例：出勤及时性"></div>`;
+    foot.innerHTML = `<button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveL2('','${id}')">保存</button>`;
+
+  } else if (type==='edit-l2') {
+    const existing = l2Data.find(l=>l.id===id);
+    title.textContent = '编辑二级指标';
+    body.innerHTML = `<div class="form-group"><label>二级指标名称</label><input type="text" id="m-l2-name" value="${existing?existing.name:''}"></div>`;
+    foot.innerHTML = `<button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveL2('${id}','')">保存</button>`;
+  }
+
+  document.getElementById('modal').classList.remove('hidden');
+  setTimeout(() => {
+    const inp = document.querySelector('#modal-body input');
+    if (inp) inp.focus();
+  }, 50);
+}
+
+function openModalRaw(titleText, bodyHtml, footBtns) {
+  document.getElementById('modal-title').textContent = titleText;
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  document.getElementById('modal-foot').innerHTML = footBtns.join('');
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+function closeModal() { document.getElementById('modal').classList.add('hidden'); modalCtx=null; }
+function closeModalIfBg(e) { if (e.target===document.getElementById('modal')) closeModal(); }
+
+async function saveKpi(id) {
+  const name = document.getElementById('m-kpi-name').value.trim();
+  const cat  = document.getElementById('m-kpi-cat').value.trim();
+  if (!name||!cat) { alert('请填写指标名称和分类'); return; }
+  if (id) await sb.from('kpi_indicators').update({name,category:cat}).eq('id',id);
+  else    await sb.from('kpi_indicators').insert({name,category:cat,sort_order:kpiData.length+1});
+  closeModal(); await loadKpi();
+}
+
+async function saveL1(id) {
+  const name = document.getElementById('m-l1-name').value.trim();
+  if (!name) { alert('请填写一级指标名称'); return; }
+  if (id) await sb.from('kpa_l1').update({name}).eq('id',id);
+  else    await sb.from('kpa_l1').insert({name,sort_order:l1Data.length+1});
+  closeModal(); await loadKpa();
+}
+
+async function saveL2(id, l1id) {
+  const name = document.getElementById('m-l2-name').value.trim();
+  if (!name) { alert('请填写二级指标名称'); return; }
+  if (id) await sb.from('kpa_l2').update({name}).eq('id',id);
+  else    await sb.from('kpa_l2').insert({name,l1_id:l1id,sort_order:l2Data.filter(x=>x.l1_id===l1id).length+1});
+  closeModal(); await loadKpa();
+}
+
+// ══════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', checkSession);
+</script>
+</body>
+</html>
